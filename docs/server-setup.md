@@ -85,3 +85,39 @@
 6. политику `deny` для входящего трафика.
 
 Результат последнего запуска: `Пройдено: 6, не пройдено: 0`.
+
+## 10. Ansible
+
+**Расположение проекта.** Каталог `ansible/` в репозитории `devops-course-2026`, ветка `feature/ansible`. Запуск выполняется из каталога `ansible/`, где лежит `ansible.cfg`.
+
+**Узлы.** Управляющий узел: MacBook Air (macOS, arm64) с ansible-core, коллекциями из `requirements.yml` и sshpass. Управляемый узел: VM `devops-vm` (UTM, Ubuntu Server 24.04 aarch64), адрес Host-only 192.168.64.2.
+
+**Inventory и учётные записи.**
+- `inventory/bootstrap.ini`: пользователь `student`, вход по паролю (только первый запуск).
+- `inventory/prod.ini`: пользователь `devops`, вход по ключу `~/.ssh/devops_vm`, пароль не запрашивается.
+- Пароли и закрытый ключ в репозиторий не входят.
+
+**Роли и ответственность.**
+- `base`: проверка ОС и архитектуры (aarch64), базовые пакеты, официальный репозиторий Docker (arm64), служба Docker.
+- `ssh`: пользователь `devops`, публичный ключ, sudo NOPASSWD, hardening SSH (`00-ansible-hardening.conf`), UFW (22 и 80), handler Restart SSH.
+- `nginx`: пакет Nginx, reverse proxy на 127.0.0.1:5000, отключение default site, handlers: `nginx -t`, затем reload.
+- `app`: загрузка образа по тегу, контейнер, проверка `/health`.
+
+**Приложение.**
+- Образ GHCR: `ghcr.io/kl1n0kiz/devops-ci-app`.
+- Полный SHA (тег): `1772892d9b59219241dd0e989f90fdd97aa8dec3`. Тег `latest` не используется.
+- Контейнер `devops-ci-app`, порт 5000 публикуется только на 127.0.0.1; наружу доступ через Nginx на порту 80.
+- Health endpoint: `/health`, ожидается `{"status":"ok"}`.
+- Требование к GHCR: пакет публичный, доступен на чтение без аутентификации.
+
+**Команды.**
+
+```bash
+cd ~/devops-course-2026/ansible
+# первичный запуск (пароль student)
+ansible-playbook -i inventory/bootstrap.ini site.yml --ask-pass --ask-become-pass
+# повторные запуски (по ключу, ожидается changed=0)
+ansible-playbook site.yml
+# read-only аудит (ничего не меняет, ожидается changed=0)
+ansible-playbook verify.yml
+```
